@@ -33,7 +33,6 @@ class SyncedMemory {
         own_cpu_data_(false),
         own_gpu_data_(false),
         device_(device_context),
-        cl_gpu_mem_(NULL) {
   }
   explicit SyncedMemory(uint_tp size, device *device_context)
       : cpu_ptr_(NULL),
@@ -43,7 +42,6 @@ class SyncedMemory {
         own_cpu_data_(false),
         own_gpu_data_(false),
         device_(device_context),
-        cl_gpu_mem_(NULL) {
   }
 #else
   explicit SyncedMemory(device *device_context)
@@ -103,10 +101,6 @@ class SyncedMemory {
   bool own_cpu_data_;
   bool own_gpu_data_;
   device *device_;
-
-#ifdef USE_GREENTEA
-  cl_mem cl_gpu_mem_;
-#endif
 
 
 DISABLE_COPY_AND_ASSIGN(SyncedMemory);

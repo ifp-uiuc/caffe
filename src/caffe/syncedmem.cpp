@@ -75,14 +75,7 @@ SyncedMemory::~SyncedMemory() {
     } else {
 #ifdef USE_GREENTEA
       // Free device memory
-      viennacl::ocl::context ctx = viennacl::ocl::get_context(
-          device_->id());
-      ctx.get_queue().finish();
-      CHECK_EQ(CL_SUCCESS, clReleaseMemObject(cl_gpu_mem_))
-          << "OpenCL memory corruption";
-      gpu_ptr_ = nullptr;
-      cl_gpu_mem_ = nullptr;
-      ctx.get_queue().finish();
+      greentea_free(gpu_ptr_, device_->id());
       device_->DecreaseMemoryUsage(size_);
 #endif  // USE_GREENTEA
     }
@@ -116,10 +109,7 @@ inline void SyncedMemory::to_cpu() {
 #endif  // USE_CUDA
       } else {
 #ifdef USE_GREENTEA
-        viennacl::ocl::context ctx = viennacl::ocl::get_context(
-            device_->id());
-        greentea_gpu_memcpy(size_, (cl_mem) gpu_ptr_, 0, cpu_ptr_, &ctx);
-        ctx.get_queue().finish();
+        greentea_gpu_memcpy(device_->id(), size_, (cl_mem) gpu_ptr_, 0, cpu_ptr_);
 #endif
       }
       head_ = SYNCED;
@@ -147,25 +137,10 @@ inline void SyncedMemory::to_gpu() {
 #endif  // USE_CUDA
       } else {
 #ifdef USE_GREENTEA
-        viennacl::ocl::context ctx = viennacl::ocl::get_context(
-            device_->id());
-        ctx.get_queue().finish();
-        cl_int err;
-        if (ctx.devices()[0].type() == CL_DEVICE_TYPE_CPU) {
-          cl_gpu_mem_ = clCreateBuffer(ctx.handle().get(),
-                     CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-                     size_, nullptr, &err);
-        } else {
-          cl_gpu_mem_ = clCreateBuffer(ctx.handle().get(), CL_MEM_READ_WRITE,
-                                       size_, nullptr, &err);
-        }
-        CHECK_EQ(0, err) << "OpenCL buffer allocation of size "
-                        << size_ << " failed.";
+	greentea_malloc(&gpu_ptr_, size_, device_->id());
         device_->IncreaseMemoryUsage(size_);
         int_tp alpha = 0;
-        greentea_memset(device_->id(), size_, alpha, cl_gpu_mem_, 0);
-        gpu_ptr_ = reinterpret_cast<void*>(cl_gpu_mem_);
-        ctx.get_queue().finish();
+        greentea_memset(device_->id(), size_, alpha, (cl_mem) gpu_ptr_, 0);
         own_gpu_data_ = true;
 #endif  // USE_GREENTEA
       }
@@ -184,27 +159,10 @@ inline void SyncedMemory::to_gpu() {
 #endif  // USE_CUDA
       } else {
 #ifdef USE_GREENTEA
-        viennacl::ocl::context ctx = viennacl::ocl::get_context(
-            device_->id());
-        ctx.get_queue().finish();
         if (gpu_ptr_ == nullptr) {
-          cl_int err;
-          if (ctx.devices()[0].type() == CL_DEVICE_TYPE_CPU) {
-            cl_gpu_mem_ = clCreateBuffer(
-                ctx.handle().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR,
-                size_, nullptr, &err);
-          } else {
-            cl_gpu_mem_ = clCreateBuffer(ctx.handle().get(), CL_MEM_READ_WRITE,
-                                         size_, nullptr, &err);
-          }
-          CHECK_EQ(0, err) << "OpenCL buffer allocation of size "
-                          << size_ << " failed.";
-          device_->IncreaseMemoryUsage(size_);
-          gpu_ptr_ = reinterpret_cast<void*>(cl_gpu_mem_);
-          ctx.get_queue().finish();
+	  greentea_malloc(&gpu_ptr_, size_, device_->id());	  
         }
-        greentea_gpu_memcpy(size_, cpu_ptr_, (cl_mem) gpu_ptr_, 0, &ctx);
-        ctx.get_queue().finish();
+        greentea_gpu_memcpy(device_->id(), size_, cpu_ptr_, (cl_mem) gpu_ptr_, 0);
         own_gpu_data_ = true;
 #endif  // USE_GREENTEA
       }
@@ -264,6 +222,14 @@ void SyncedMemory::set_gpu_data(void* data) {
   } else {
 #ifdef USE_GREENTEA
     // TODO: Implement OpenCL - OpenCL and OpenCL - CUDA data sharing
+    CHECK(data);
+    if (own_gpu_data_) {
+      greentea_free(gpu_ptr_, device_->id());
+      gpu_ptr_ = nullptr;
+    }
+    gpu_ptr_ = data;
+    head_ = HEAD_AT_GPU;
+    own_gpu_data_ = false;
 #endif  // USE_GREENTEA
   }
 #else
