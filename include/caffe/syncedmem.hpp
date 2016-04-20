@@ -32,7 +32,7 @@ class SyncedMemory {
         head_(UNINITIALIZED),
         own_cpu_data_(false),
         own_gpu_data_(false),
-        device_(device_context),
+        device_(device_context) {
   }
   explicit SyncedMemory(uint_tp size, device *device_context)
       : cpu_ptr_(NULL),
@@ -41,7 +41,7 @@ class SyncedMemory {
         head_(UNINITIALIZED),
         own_cpu_data_(false),
         own_gpu_data_(false),
-        device_(device_context),
+        device_(device_context) {
   }
 #else
   explicit SyncedMemory(device *device_context)
