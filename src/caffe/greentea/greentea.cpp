@@ -28,8 +28,17 @@ viennacl::ocl::handle<cl_mem> WrapHandle(cl_mem in,
     return memhandle;
   }
 }
-
-#endif
+  
+void greentea_malloc(void ** devPtr, int_tp size, int device_id) {
+  viennacl::ocl::context &ctx = viennacl::ocl::get_context(device_id);
+  ctx.get_queue().finish();
+  cl_int err;
+  cl_mem cl_data_ = clCreateBuffer(ctx.handle().get(), CL_MEM_READ_WRITE, size, nullptr, &err);
+  CHECK_EQ(0, err) << "OpenCL buffer allocation of size " << size << " failed.";
+  *devPtr = reinterpret_cast<void *> (cl_data_);
+}
+  
+#endif // USE_GREENTEA
 
 
 }  // namespace caffe

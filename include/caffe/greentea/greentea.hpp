@@ -49,6 +49,10 @@ namespace caffe {
 #ifdef USE_GREENTEA
 viennacl::ocl::handle<cl_mem> WrapHandle(cl_mem in,
                                          viennacl::ocl::context *ctx);
+  
+void greentea_malloc(void ** devPtr, int_tp size, int device_id);
+
+  
 #endif
 
 enum Backend {
