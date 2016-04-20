@@ -51,7 +51,7 @@ viennacl::ocl::handle<cl_mem> WrapHandle(cl_mem in,
                                          viennacl::ocl::context *ctx);
   
 void greentea_malloc(void ** devPtr, int_tp size, int device_id);
-
+void greentea_free(void * devPtr, int device_id);
   
 #endif
 
