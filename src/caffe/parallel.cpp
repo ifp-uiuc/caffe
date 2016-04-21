@@ -98,9 +98,7 @@ static void apply_buffers_greentea(const vector<Blob<Dtype>*>& blobs, cl_mem buf
     switch (op) {
       case copy: {
         // Init buffer to current values of blobs
-	viennacl::ocl::context &ctx = viennacl::ocl::get_context(device_id);
-	ctx.get_queue().finish();
-	greentea_gpu_memcpy(size, blobs[i]->data()->cpu_data(), buffer, offset, &ctx);
+	greentea_gpu_memcpy(device_id, size, blobs[i]->data()->cpu_data(), buffer, offset);
         break;
       }
       case replace_cpu:

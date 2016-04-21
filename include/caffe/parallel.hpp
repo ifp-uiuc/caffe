@@ -119,6 +119,10 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   Dtype* parent_grads_;
   shared_ptr<Solver<Dtype> > solver_;
 
+  #ifdef USE_GREENTEA
+  Dtype* parent_cpu_data_;
+  Dtype* cpu_grads_;
+  #endif
   using Params<Dtype>::size_;
   using Params<Dtype>::data_;
   using Params<Dtype>::diff_;
