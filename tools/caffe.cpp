@@ -235,7 +235,7 @@ int train() {
     caffe::P2PSync<float> sync(solver, NULL, solver->param());
     std::vector<device*> devices;
     for (int_tp i = 0; i < gpus.size(); ++i) {
-      devices.push_back(Caffe::Get().GetDevice(i, true));
+      devices.push_back(Caffe::Get().GetDevice(gpus[i]));
     }
     sync.Run(devices);
   } else {
