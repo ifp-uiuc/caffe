@@ -25,6 +25,28 @@ namespace caffe {
 void greentea_memset(const int_tp ctx_id, const uint_tp N, const int_tp alpha,
                      cl_mem X, const int_tp offX);
 
+void greentea_gpu_memcpy(const uint_tp N, const cl_mem X, const int_tp offX,
+                         void *Y, viennacl::ocl::context *ctx);
+
+void greentea_gpu_memcpy(const uint_tp N, const void *X, cl_mem Y,
+                         const int_tp offY, viennacl::ocl::context *ctx);
+
+void greentea_gpu_memcpy(const uint_tp N, const cl_mem X, const int_tp offX,
+                         cl_mem Y, const int_tp offY,
+                         viennacl::ocl::context *ctx);
+
+template <typename Dtype>
+void greentea_copy(const int_tp N, const cl_mem X, const int_tp offX, cl_mem Y,
+                   const int_tp offY, viennacl::ocl::context *ctx);
+
+template <typename Dtype>
+void greentea_copy(const int_tp N, const cl_mem X, const int_tp offX, Dtype *Y,
+                   viennacl::ocl::context *ctx);
+
+template <typename Dtype>
+void greentea_copy(const int_tp N, const Dtype *X, cl_mem Y, const int_tp offY,
+                   viennacl::ocl::context *ctx);
+
 void greentea_gpu_memcpy(const int_tp ctx_id, const uint_tp N, const cl_mem X,
                          const int_tp offX, void *Y);
 
