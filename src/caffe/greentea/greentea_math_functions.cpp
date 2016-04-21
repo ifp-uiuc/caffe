@@ -23,6 +23,7 @@
 #include <limits>
 #include <random>
 #include <vector>
+#include <mutex>
 
 #include "viennacl/backend/opencl.hpp"
 #include "viennacl/ocl/backend.hpp"
@@ -60,6 +61,8 @@
 
 namespace caffe {
 
+std::mutex clblas_mtx;
+  
 void greentea_memset(const int_tp ctx_id, const uint_tp N, const int_tp alpha,
                      cl_mem X, const int_tp offX) {
   viennacl::ocl::context &ctx = viennacl::ocl::get_context(ctx_id);
@@ -341,6 +344,7 @@ void greentea_gpu_gemm(const int_tp ctx_id, const CBLAS_TRANSPOSE TransA,
 
     cl_command_queue queue = ctx.get_queue().handle().get();
 
+    clblas_mtx.lock();
     if (std::is_same<Dtype, float>::value) {
       GREENTEA_CL_BLAS_CHECK(clblasSgemm(
           clOrder, clTransA, clTransB, M, N, K, alpha, A, offA, lda, B, offB,
@@ -350,6 +354,7 @@ void greentea_gpu_gemm(const int_tp ctx_id, const CBLAS_TRANSPOSE TransA,
           clOrder, clTransA, clTransB, M, N, K, alpha, A, offA, lda, B, offB,
           ldb, beta, C, offC, ldc, 1, &queue, 0, NULL, NULL));
     }
+    clblas_mtx.unlock();
 #endif
   }
 }
