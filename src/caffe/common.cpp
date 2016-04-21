@@ -473,7 +473,7 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
   }
 #endif  // USE_GREENTEA
 
-  Get().default_device_ = GetDevice(0);
+  Get().default_device_ = devices_[0].get();
   Caffe::SelectDevice(Get().default_device_);
 }
 
