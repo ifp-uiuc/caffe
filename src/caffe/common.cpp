@@ -78,21 +78,15 @@ void GlobalInit(int* pargc, char*** pargv) {
 }
 
 
-device *Caffe::GetDevice(int id, bool listId) {
-  if (listId) {
-    return
-        id == -1 ?
-            Get().default_device_ :
-            Get().devices_[id % Get().devices_.size()].get();
-  } else {
-    for (int i = 0; i < Get().devices_.size(); ++i) {
-      device* device = Get().devices_[i].get();
-      if (device->id() == id) {
-        return device;
-      }
+device *Caffe::GetDevice(int id) {
+  for (int i = 0; i < Get().devices_.size(); ++i) {
+    device* device = Get().devices_[i].get();
+    if (device->id() == id) {
+      return device;
     }
-    return GetDefaultDevice();
   }
+  // This shall be treated as error. 
+  LOG(FATAL) << "Cannot find device id=" << id;
 }
 
 device *Caffe::GetDefaultDevice() {
@@ -124,8 +118,8 @@ Caffe::Caffe(const Caffe &obj)
   solver_count_ = obj.solver_count_;
 }
 
-void Caffe::SelectDevice(int id, bool listId) {
-  Caffe::SelectDevice(GetDevice(id, listId));
+void Caffe::SelectDevice(int id) {
+  Caffe::SelectDevice(GetDevice(id));
 }
 
 void Caffe::SelectDevice(device* device_context) {
@@ -316,7 +310,7 @@ void Caffe::set_random_seed(const size_t seed, device* device_context) {
 
 void Caffe::Synchronize(int device_id) {
   if (Caffe::mode() == Brew::GPU) {
-    device * device_context = Caffe::GetDevice(device_id, true);
+    device * device_context = Caffe::GetDevice(device_id);
     if (device_context->backend() == BACKEND_CUDA) {
 #ifdef USE_CUDA
       cudaDeviceSynchronize();
@@ -324,7 +318,7 @@ void Caffe::Synchronize(int device_id) {
     } else {
 #ifdef USE_GREENTEA
       viennacl::ocl::context &ctx = viennacl::ocl::get_context(
-          GetDevice(device_id, true)->id());
+          GetDevice(device_id)->id());
       ctx.get_queue().finish();
 #endif  // USE_GREENTEA
     }
@@ -479,7 +473,7 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
   }
 #endif  // USE_GREENTEA
 
-  Get().default_device_ = GetDevice(0, true);
+  Get().default_device_ = GetDevice(0);
   Caffe::SelectDevice(Get().default_device_);
 }
 
@@ -491,7 +485,7 @@ void Caffe::SetDevice(const int device_id) {
     Caffe::SetDevices(std::vector<int> { device_id });
   }
 
-  Get().default_device_ = GetDevice(0, true);
+  Get().default_device_ = GetDevice(device_id);
 #if defined(USE_GREENTEA) && defined(USE_FFT)
   Get().cl_fft_state_.setup();
 #endif

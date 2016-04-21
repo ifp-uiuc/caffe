@@ -174,7 +174,7 @@ class Caffe {
   static void TeardownDevice(const int device_id);
   // Switch the current device
   static void SelectDevice(device* device_context);
-  static void SelectDevice(int id, bool listId);
+  static void SelectDevice(int id);
 
   // Prints the current GPU status.
   static void DeviceQuery();
@@ -201,7 +201,7 @@ class Caffe {
   static void Synchronize(int device_id);
 
   // Get a device context
-  static device *GetDevice(int id, bool listId);
+  static device *GetDevice(int id);
 
  protected:
 #ifndef CPU_ONLY
