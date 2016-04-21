@@ -17,6 +17,7 @@
 #include "boost/thread.hpp"
 #include "caffe/caffe.hpp"
 #include "caffe/parallel.hpp"
+#include "caffe/greentea/greentea.hpp"
 
 namespace caffe {
 
@@ -28,6 +29,14 @@ enum Op {
   replace_gpu_diff
 };
 
+uint_tp _align_size(uint_tp size, int align) {
+  if (size % align == 0) {
+    return size;
+  } else {
+    return size + align - (size % align);
+  }
+}
+  
 template<typename Dtype>
 static void apply_buffers(const vector<Blob<Dtype>*>& blobs, Dtype* buffer,
                           uint_tp total_size, Op op) {
@@ -61,12 +70,69 @@ static void apply_buffers(const vector<Blob<Dtype>*>& blobs, Dtype* buffer,
   CHECK_EQ(total_size, (ptr == buffer ? 1 : ptr - buffer));
 }
 
+#ifdef USE_GREENTEA
+template<typename Dtype>
+static void apply_buffers_greentea(const vector<Blob<Dtype>*>& blobs, cl_mem buffer,
+				   uint_tp total_size, Op op, int device_id) {
+  uint_tp offset = 0;
+
+  size_t mem_size, ret_size;
+  DLOG(INFO) << "total_size: " << total_size;
+  clGetMemObjectInfo(buffer,  CL_MEM_SIZE , sizeof(size_t),  &mem_size, &ret_size);
+  DLOG(INFO) << "Incoming buffer size : " << mem_size; 
+  for (int i = 0; i < blobs.size(); ++i) {
+    int_tp size = blobs[i]->count()*sizeof(Dtype);
+    cl_buffer_region region;
+    region.origin = offset;
+    DLOG(INFO) << "Region offset " << offset;
+    DLOG(INFO) << "Region size " << size;
+    region.size = size;
+    cl_int r_code;
+    cl_mem sub_buffer = clCreateSubBuffer(buffer,
+					  CL_MEM_READ_WRITE,
+					  CL_BUFFER_CREATE_TYPE_REGION,
+					      &region,
+					  &r_code);
+    CHECK_EQ(r_code, CL_SUCCESS);
+    
+    switch (op) {
+      case copy: {
+        // Init buffer to current values of blobs
+	viennacl::ocl::context &ctx = viennacl::ocl::get_context(device_id);
+	ctx.get_queue().finish();
+	greentea_gpu_memcpy(size, blobs[i]->data()->cpu_data(), buffer, offset, &ctx);
+        break;
+      }
+      case replace_cpu:
+        CHECK(0);
+        break;
+      case replace_gpu:
+        blobs[i]->data()->set_gpu_data(sub_buffer);
+        break;
+      case replace_cpu_diff:
+        CHECK(0);
+        break;
+      case replace_gpu_diff:
+        blobs[i]->diff()->set_gpu_data(sub_buffer);
+        break;
+    }
+    offset += size;
+    offset = _align_size(offset, 256);
+  }
+  // total_size is at least one byte
+  //CHECK_EQ(total_size, (offset==0 ? 1 : offset));
+}
+#endif // USE_GREENTEA
+  
 // Buffer size necessary to store given blobs
 template<typename Dtype>
 static uint_tp total_size(const vector<Blob<Dtype>*>& params) {
   uint_tp size = 0;
-  for (int i = 0; i < params.size(); ++i)
+  for (int i = 0; i < params.size(); ++i) {
     size += params[i]->count();
+    // TODO: verify the alignment.
+    size = _align_size(size, 256/4);
+  }
   // Size have at least one byte, otherwise cudaMalloc fails if net has no
   // learnable parameters.
   return (size > 0) ? size : 1;
@@ -98,7 +164,23 @@ GPUParams<Dtype>::GPUParams(shared_ptr<Solver<Dtype> > root_solver, int device)
   caffe_gpu_set(size_, Dtype(0), diff_);
 
   CUDA_CHECK(cudaSetDevice(initial_device));
-#endif  // USE_CUDA
+#elif USE_GREENTEA
+  DLOG(INFO) << "GREENTEA MALLOC " << size_*sizeof(Dtype) << " bytes for data and diff";
+  greentea_malloc((void**) &data_, size_*sizeof(Dtype), device);
+  greentea_malloc((void**) &diff_, size_*sizeof(Dtype), device);
+  const vector<Blob<Dtype>*>& net = root_solver->net()->learnable_params();
+
+  int dbg = 0;
+  for (int i = 0; i < net.size(); ++i)
+    dbg += net[i]->count();
+
+  DLOG(INFO) << "total of " << dbg << " parameters";
+  apply_buffers_greentea(net, (cl_mem) data_, size_, copy, device);
+  
+  DLOG(INFO) << "greentea_gpu_set diff_ to 0";
+  greentea_gpu_set(device, size_, Dtype(0), (cl_mem) diff_, 0);
+  DLOG(INFO) << "complete initialization of device " << device;
+#endif // USE_GREENTEA or USE_CUDA
 #else
   NO_GPU;
 #endif
@@ -110,6 +192,7 @@ GPUParams<Dtype>::~GPUParams() {
 #ifdef USE_CUDA
   CUDA_CHECK(cudaFree(data_));
   CUDA_CHECK(cudaFree(diff_));
+#elif USE_GREENTEA
 #endif  // USE_CUDA
 #endif  // !CPU_ONLY
 }
@@ -117,8 +200,15 @@ GPUParams<Dtype>::~GPUParams() {
 template<typename Dtype>
 void GPUParams<Dtype>::configure(Solver<Dtype>* solver) const {
   const vector<Blob<Dtype>*>& net = solver->net()->learnable_params();
+#ifdef USE_GREENTEA
+  int device_id = solver->param().device_id();
+  DLOG(INFO) << "GPU Params: configure " << device_id;
+  apply_buffers_greentea(net, (cl_mem) data_, size_, replace_gpu, device_id);
+  apply_buffers_greentea(net, (cl_mem) diff_, size_, replace_gpu_diff, device_id);
+#else
   apply_buffers(net, data_, size_, replace_gpu);
   apply_buffers(net, diff_, size_, replace_gpu_diff);
+#endif // USE_GREENTEA
 }
 
 void DevicePair::compute(const vector<device*> devices,
@@ -259,7 +349,39 @@ P2PSync<Dtype>::P2PSync(shared_ptr<Solver<Dtype> > root_solver,
   }
 
   CUDA_CHECK(cudaSetDevice(initial_device));
-#endif  // USE_CUDA
+#endif // USE_CUDA
+  
+#ifdef USE_GREENTEA
+  int initial_device = Caffe::GetDefaultDevice()->id();
+  if (parent == NULL) {
+    solver_ = root_solver;
+  } else {
+    Caffe::set_root_solver(false);
+    Caffe::SetDevice(param.device_id());
+    DLOG(INFO) << "Constructing WorkerSolver on device " << param.device_id();
+    solver_.reset(new WorkerSolver<Dtype>(param, root_solver.get()));
+    Caffe::set_root_solver(true);
+  }
+  this->configure(solver_.get());
+  solver_->add_callback(this);
+
+  if (parent) {
+    parent_cpu_data_ = parent->parent_cpu_data_;    
+  } else {
+    // Root solver allocate params on host.
+    parent_cpu_data_ = new Dtype[size_];
+  }
+
+  // Everyone has a grad buffer on host.
+  cpu_grads_ = new Dtype[size_];
+  // Everyone has a grad buffer on device, too.
+  // In this greentea case, this is actually 'child_grad_'
+  const int self = param.device_id();
+  greentea_malloc((void**) &parent_grads_, size_*sizeof(Dtype), self);
+
+  Caffe::SetDevice(initial_device);
+
+#endif //USE_GREENTEA
 #else
   NO_GPU;
 #endif
@@ -286,6 +408,13 @@ P2PSync<Dtype>::~P2PSync() {
 
   CUDA_CHECK(cudaSetDevice(initial_device));
 #endif  // USE_CUDA
+
+#ifdef USE_GREENTEA
+  if (!parent_) {
+    delete [] parent_cpu_data_;
+  } 
+  delete [] cpu_grads_;
+#endif // USE_GREENTEA
 #endif  // !CPU_ONLY
 }
 
@@ -344,6 +473,28 @@ void P2PSync<Dtype>::on_start() {
     children_[i]->queue_.push(this);
   }
 #endif  // USE_CUDA
+
+#ifdef USE_GREENTEA
+  // Wait for update from parent
+  int device_id = solver_->param().device_id();
+  if (parent_) {
+    P2PSync<Dtype> *parent = queue_.pop();
+    CHECK(parent == parent_);
+    // Copy from the host to GPU
+    greentea_gpu_memcpy(device_id, size_ * sizeof(Dtype), parent_cpu_data_,  (cl_mem) data_, 0);
+  } else {
+    // This is the root, read params to host.
+    greentea_gpu_memcpy(device_id, size_ * sizeof(Dtype), (cl_mem) data_, 0, parent_cpu_data_);
+  }
+
+  // Sync device
+  Caffe::Synchronize(device_id);
+  // notify children. 
+  for (int i = children_.size() - 1; i >= 0; i--) {
+    children_[i]->queue_.push(this);
+  }
+#endif  // USE_GREENTEA
+
 #endif  // !CPU_ONLY
 }
 
@@ -405,6 +556,29 @@ void P2PSync<Dtype>::on_gradients_ready() {
     caffe_gpu_scal(size_, Dtype(1.0 / Caffe::solver_count()), diff_);
   }
 #endif  // USE_CUDA
+
+#ifdef USE_GREENTEA
+  // Sum children gradients as they appear in the queue
+  int device_id = solver_->param().device_id();
+  for (int i = 0; i < children_.size(); ++i) {
+    P2PSync<Dtype> *child = queue_.pop();
+    Dtype* src = child->cpu_grads_;
+    greentea_copy(device_id, size_ * sizeof(Dtype), src, (cl_mem) parent_grads_, 0);
+    greentea_gpu_add<Dtype>(device_id, size_, (cl_mem) parent_grads_, 0, (cl_mem) diff_, 0, (cl_mem) diff_, 0);
+  }
+
+  // Send gradients to parent
+  if (parent_) {
+    greentea_copy(device_id, size_ * sizeof(Dtype), (cl_mem) diff_, 0, cpu_grads_);
+    Caffe::Synchronize(device_id);
+    parent_->queue_.push(this);
+  } else {
+    // Loss functions divide gradients by the batch size, so to compensate
+    // for split batch, the root solver divides by number of solvers.
+    greentea_gpu_scale(device_id, size_, Dtype(1.0 / Caffe::solver_count()), (cl_mem) diff_, 0, (cl_mem) diff_, 0);
+  }
+#endif  // USE_GREENTEA
+  
 #endif  // !CPU_ONLY
 }
 
@@ -416,8 +590,9 @@ void P2PSync<Dtype>::Prepare(const vector<device*>& gpus,
   DevicePair::compute(gpus, &pairs);
   ostringstream s;
   for (int i = 1; i < pairs.size(); ++i) {
-    s << (i == 1 ? "" : ", ") << pairs[i].get_parent() << ":"
-      << pairs[i].get_device();
+    s << (i == 1 ? "" : ", ") << pairs[i].get_parent()->list_id() << ":"
+      << pairs[i].get_device()->list_id();
+     
   }
   LOG(INFO)<< "GPUs pairs " << s.str();
 
@@ -432,13 +607,13 @@ void P2PSync<Dtype>::Prepare(const vector<device*>& gpus,
           P2PSync<Dtype>* sync = j == 0 ? this : syncs->at(j).get();
           if (sync) {
             const SolverParameter& p = sync->solver()->param();
-            if (p.device_id() == pairs[i].get_parent()->list_id()) {
+            if (p.device_id() == pairs[i].get_parent()->id()) {
               parent = sync;
             }
           }
         }
         if (parent) {
-          param.set_device_id(pairs[i].get_device()->list_id());
+          param.set_device_id(pairs[i].get_device()->id());
           syncs->at(i).reset(new P2PSync<Dtype>(solver_, parent, param));
           parent->children_.push_back((P2PSync<Dtype>*) syncs->at(i).get());
         }
@@ -454,8 +629,12 @@ void P2PSync<Dtype>::Run(const vector<device*>& gpus) {
 
   LOG(INFO)<< "Starting Optimization";
 
+  DLOG(INFO) << "syncs array";
+  
   for (int i = 1; i < syncs.size(); ++i) {
-    syncs[i]->StartInternalThread(solver_->get_device());
+    DLOG(INFO) << "syncs " << i << ": " << syncs[i];
+    //syncs[i]->StartInternalThread(solver_->get_device());
+    syncs[i]->StartInternalThread(gpus[i]);
   }
 
   // Run root solver on current thread
