@@ -17,8 +17,7 @@ static boost::mutex bodies_mutex_;
 
 DataReader::DataReader(const LayerParameter& param)
     : queue_pair_(new QueuePair(  //
-        param.data_param().prefetch() * param.data_param().batch_size())),
-      device_(Caffe::GetDevice(param.device())) {
+				param.data_param().prefetch() * param.data_param().batch_size())), device_(Caffe::GetDefaultDevice()) {
   // Get or create a body
   boost::mutex::scoped_lock lock(bodies_mutex_);
   string key = source_key(param);
