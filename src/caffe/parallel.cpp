@@ -567,13 +567,13 @@ void P2PSync<Dtype>::on_gradients_ready() {
   for (int i = 0; i < children_.size(); ++i) {
     P2PSync<Dtype> *child = queue_.pop();
     Dtype* src = child->cpu_grads_;
-    greentea_copy(device_id, size_ * sizeof(Dtype), src, (cl_mem) parent_grads_, 0);
+    greentea_copy(device_id, size_, src, (cl_mem) parent_grads_, 0);
     greentea_gpu_add<Dtype>(device_id, size_, (cl_mem) parent_grads_, 0, (cl_mem) diff_, 0, (cl_mem) diff_, 0);
   }
 
   // Send gradients to parent
   if (parent_) {
-    greentea_copy(device_id, size_ * sizeof(Dtype), (cl_mem) diff_, 0, cpu_grads_);
+    greentea_copy(device_id, size_, (cl_mem) diff_, 0, cpu_grads_);
     Caffe::Synchronize(device_id);
     parent_->queue_.push(this);
   } else {
