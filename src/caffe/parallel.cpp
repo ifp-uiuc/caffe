@@ -413,7 +413,8 @@ P2PSync<Dtype>::~P2PSync() {
 #endif  // USE_CUDA
 
 #ifdef USE_GREENTEA
-  if (!parent_) {
+  if (parent_ == NULL) {
+    // root solver own the host param copy. 
     delete [] parent_cpu_data_;
   } 
   delete [] cpu_grads_;
