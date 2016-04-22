@@ -190,8 +190,13 @@ GPUParams<Dtype>::~GPUParams() {
 #ifdef USE_CUDA
   CUDA_CHECK(cudaFree(data_));
   CUDA_CHECK(cudaFree(diff_));
-#elif USE_GREENTEA
-#endif  // USE_CUDA
+#endif  // USE_CUDA  
+#ifdef USE_GREENTEA
+  // TODO: check whether this is called in the right thread.
+  int cur_device = Caffe::GetDefaultDevice()->id();
+  greentea_free(data_, cur_device);
+  greentea_free(diff_, cur_device);
+#endif // USE_GREENTEA
 #endif  // !CPU_ONLY
 }
 
@@ -588,8 +593,8 @@ void P2PSync<Dtype>::Prepare(const vector<device*>& gpus,
   DevicePair::compute(gpus, &pairs);
   ostringstream s;
   for (int i = 1; i < pairs.size(); ++i) {
-    s << (i == 1 ? "" : ", ") << pairs[i].get_parent()->list_id() << ":"
-      << pairs[i].get_device()->list_id();
+    s << (i == 1 ? "" : ", ") << pairs[i].get_parent()->id() << ":"
+      << pairs[i].get_device()->id();
      
   }
   LOG(INFO)<< "GPUs pairs " << s.str();
