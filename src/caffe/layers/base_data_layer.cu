@@ -46,6 +46,7 @@ void BasePrefetchingDataLayer<Dtype>::Forward_gpu(
       greentea_copy<Dtype>(batch->label_.count(),
                            (cl_mem) (batch->label_.gpu_data()), 0,
                            (cl_mem) (top[1]->mutable_gpu_data()), 0, &ctx);
+      Caffe::Synchronize(this->device_->id());
     }
 #endif  // USE_GREENTEA
   }
