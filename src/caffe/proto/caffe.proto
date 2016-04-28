@@ -27,6 +27,7 @@ message BlobProtoVector {
   repeated BlobProto blobs = 1;
 }
 
+
 message Datum {
   optional int64 channels = 1;
   optional int64 height = 2;
@@ -38,6 +39,11 @@ message Datum {
   repeated float float_data = 6;
   // If true data contains an encoded image that need to be decoded
   optional bool encoded = 7 [default = false];
+}
+
+// For video input
+message DatumList {
+  repeated Datum datums = 1;
 }
 
 message FillerParameter {
