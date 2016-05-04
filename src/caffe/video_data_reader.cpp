@@ -202,12 +202,15 @@ void VideoDataReader::Body::fetch_one_sample(
 
 void VideoDataReader::Body::read_one(db::Transaction* txn, QueuePair* qp) {
   DatumList* dl = qp->free_.pop();
-  int_tp label;
+  // by default, use 0 as label
+  int_tp label = 0;
   if (has_label_file && param_.video_param().sampling()) {
     random_sample(txn, dl, &label);
   } else {
     uniform_scan(txn, dl);
   }
+  // hard encode the label into the first datum in datumlist
+  dl->mutable_datums(0)->set_label(label);
   qp->full_.push(dl);
 }
 
