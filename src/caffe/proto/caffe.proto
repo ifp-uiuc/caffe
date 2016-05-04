@@ -412,6 +412,9 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   optional MergeCropParameter mergecrop_param = 145;
   optional AffinityParameter affinity_param = 146;
+
+  // Customized LayerParameter
+  optional VideoDataParameter video_param = 800001;
 }
 
 // Message that stores parameters used to apply transformation
@@ -1146,6 +1149,26 @@ message TileParameter {
 // Message that stores parameters used by ThresholdLayer
 message ThresholdParameter {
   optional float threshold = 1 [default = 0]; // Strictly positive values
+}
+
+message VideoDataParameter {
+  // Parameters for videodata layer
+  optional string source = 1;
+  // The filename of labels, in plain text file format
+  optional string label_source = 2;
+  optional uint64 batch_size = 3;
+  // The number of frames in each sample
+  optional uint64 temporal_size = 4 [default = 15];
+  // Chunk size of datum list, which is used for calculating
+  // the chunk id
+  optional uint64 chunk_size = 5 [default = 100];
+  optional string backend = 6 [default = "LMDB"];
+  // Used for valiation and test: the stride of temporal sliding window
+  optional uint64 temporal_stride = 7 [default = 1];
+  // Prefetch queue (Number of batches to prefetch to host memory, increase if
+  // data access bandwidth varies).
+  optional uint64 prefetch = 10 [default = 4];
+  optional bool sampling = 11 [default = true];
 }
 
 message WindowDataParameter {
