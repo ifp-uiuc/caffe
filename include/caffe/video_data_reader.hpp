@@ -55,14 +55,14 @@ class VideoDataReader {
 
    protected:
     void InternalThreadEntry();
-    void read_one(db::Transaction* txnr, QueuePair* qp);
+    void read_one(db::Transaction* txn, db::Cursor* cur, QueuePair* qp);
 
     // build index from label file
     void build_index();
     // Random sample a 3d block
     void random_sample(db::Transaction* txn, DatumList* dl, int_tp* label);
     // Uniformly get 3d block
-    void uniform_scan(db::Transaction* txn, DatumList* dl);
+    void uniform_scan(db::Cursor* cur, DatumList* dl);
     void fetch_one_sample(db::Transaction* txn, DatumList* dl,
                           std::string video_id, int_tp frame_begin);
     // Calculate chunk_id
@@ -78,6 +78,10 @@ class VideoDataReader {
 
     bool has_label_file;
     int_tp label_count;
+    // Following members are used for uniformly scan only
+    bool current_dl_finished = true;
+    int_tp current_frame_idx = 0;
+    DatumList current_dl;
 
     friend class VideoDataReader;
 

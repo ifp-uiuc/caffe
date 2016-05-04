@@ -81,6 +81,7 @@ void VideoDataReader::Body::InternalThreadEntry() {
   shared_ptr<db::DB> db(db::GetDB(param_.video_param().backend()));
   db->Open(param_.video_param().source(), db::READ);
   shared_ptr<db::Transaction> txn(db->NewTransaction());
+  shared_ptr<db::Cursor> cur(db->NewCursor());
   vector<shared_ptr<QueuePair> > qps;
   if (param_.video_param().has_label_source()) {
     has_label_file = true;
@@ -98,13 +99,13 @@ void VideoDataReader::Body::InternalThreadEntry() {
     // so read one item, then wait for the next solver.
     for (int_tp i = 0; i < solver_count; ++i) {
       shared_ptr<QueuePair> qp(new_queue_pairs_.pop());
-      read_one(txn.get(), qp.get());
+      read_one(txn.get(), cur.get(), qp.get());
       qps.push_back(qp);
     }
     // Main loop
     while (!must_stop()) {
       for (int_tp i = 0; i < solver_count; ++i) {
-        read_one(txn.get(), qps[i].get());
+        read_one(txn.get(), cur.get(), qps[i].get());
       }
       // Check no additional readers have been created. This can happen if
       // more than one net is trained at a time per process, whether single
@@ -167,10 +168,32 @@ void VideoDataReader::Body::random_sample(
       txn, dl, sample_video_id, begin_frame_choice + sample_begin_frame);
 }
 
-void VideoDataReader::Body::uniform_scan(db::Transaction* txn, DatumList* dl) {
+void VideoDataReader::Body::uniform_scan(
+    db::Cursor* cur, DatumList* dl) {
   // Uniformly slide across all frames, this is used for validation and testing
-  // TO-DO:
-  LOG(INFO) << "Need to implement.";
+  int_tp temporal_size = param_.video_param().temporal_size();
+  int_tp stride = param_.video_param().temporal_stride();
+  if (current_dl_finished) {
+    current_dl.ParseFromString(cur->value());
+    current_frame_idx = 0;
+    current_dl_finished = false;
+  }
+  // get a blob
+  for (int i=0; i<temporal_size; ++i) {
+    Datum* datum = dl->add_datums();
+    datum->CopyFrom(current_dl.datums(i+current_frame_idx));
+  }
+  current_frame_idx += stride;
+  if (current_frame_idx + temporal_size >= current_dl.datums_size()) {
+    // remaining frames are not enough for a new sample
+    // prepare to fetech next datum_list from cursor
+    current_dl_finished = true;
+    cur->Next();
+    if (!cur->valid()) {
+      DLOG(INFO) << "Restarting data prefetching from start.";
+      cur->SeekToFirst();
+    }
+  }
 }
 
 /**
@@ -200,14 +223,16 @@ void VideoDataReader::Body::fetch_one_sample(
   }
 }
 
-void VideoDataReader::Body::read_one(db::Transaction* txn, QueuePair* qp) {
+void VideoDataReader::Body::read_one(
+    db::Transaction* txn, db::Cursor* cur, QueuePair* qp) {
   DatumList* dl = qp->free_.pop();
+  dl->clear_datums();
   // by default, use 0 as label
   int_tp label = 0;
   if (has_label_file && param_.video_param().sampling()) {
     random_sample(txn, dl, &label);
   } else {
-    uniform_scan(txn, dl);
+    uniform_scan(cur, dl);
   }
   // hard encode the label into the first datum in datumlist
   dl->mutable_datums(0)->set_label(label);
