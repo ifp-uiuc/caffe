@@ -113,7 +113,6 @@ void VideoDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   top_shape[0] = batch_size;
   batch->data_.Reshape(top_shape);
 
-  Dtype* top_data = batch->data_.mutable_cpu_data();
   Dtype* top_label = NULL;  // suppress warnings about uninitialized variables
 
   if (this->output_labels_) {
@@ -136,7 +135,7 @@ void VideoDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
 		 <<" encoded: " << datum->encoded();
       this->data_transformer_->Transform(*datum, &(this->transformed_data_));
       // Copy data.
-      //_copy_frame(item_id, frame_id, this->transformed_data_, &batch->data_);
+      _copy_frame(item_id, frame_id, this->transformed_data_, &batch->data_);
     }
 
     // Copy label.
