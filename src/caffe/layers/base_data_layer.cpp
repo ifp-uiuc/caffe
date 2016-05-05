@@ -100,6 +100,11 @@ void BasePrefetchingDataLayer<Dtype>::InternalThreadEntry() {
         }
       }
 #endif  // USE_CUDA
+#ifdef USE_GREENTEA
+      if (Caffe::mode() == Caffe::GPU) {
+	Caffe::Synchronize(this->device_->id());
+      }
+#endif USE_GREENTEA
 #endif  // !CPU_ONLY
       prefetch_full_.push(batch);
     }
