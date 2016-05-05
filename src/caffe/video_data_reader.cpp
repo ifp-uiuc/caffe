@@ -154,7 +154,7 @@ void VideoDataReader::Body::random_sample(
   int_tp sample_choice = sample_id_sampler();
 
   // get sample information
-  LOG(INFO) << "label choice: " << label_choice
+  DLOG(INFO) << "label choice: " << label_choice
 	    << " sample choice: " << sample_choice;
   std::tuple<std::string, int_tp, int_tp, int_tp> sample_
       = (label_index[label_choice])[sample_choice];

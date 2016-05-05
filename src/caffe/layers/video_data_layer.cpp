@@ -32,7 +32,12 @@ void VideoDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   // Use data_transformer to infer the expected blob shape from datum.
   CHECK(datum_list.datums_size() > 0);
   
-  vector<int_tp> frame_shape = this->data_transformer_->InferBlobShape(datum_list.datums(0));
+
+  Datum *datum = datum_list.mutable_datums(0);
+  // ! Temporary hack for a dataset where encoded was not set correctly.
+  datum->set_encoded(true);
+  vector<int_tp> frame_shape = this->data_transformer_->InferBlobShape(*datum);
+  
   CHECK(frame_shape.size() == 4);
 
   int_tp temporal_size = this->layer_param_.video_param().temporal_size();
@@ -97,8 +102,11 @@ void VideoDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   DatumList& datum_list = *(reader_.full().peek());
 
   CHECK(datum_list.datums_size() > 0);
-  
-  vector<int_tp> frame_shape = this->data_transformer_->InferBlobShape(datum_list.datums(0));
+
+  Datum *datum = datum_list.mutable_datums(0);
+  // ! Temporary hack for a dataset where encoded was not set correctly.
+  datum->set_encoded(true);
+  vector<int_tp> frame_shape = this->data_transformer_->InferBlobShape(*datum);
   CHECK(frame_shape.size() == 4);
 
   int_tp temporal_size = this->layer_param_.video_param().temporal_size();
