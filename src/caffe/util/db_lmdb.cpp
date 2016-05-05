@@ -49,7 +49,7 @@ LMDBCursor* LMDB::NewCursor() {
 
 LMDBTransaction* LMDB::NewTransaction() {
   MDB_txn* mdb_txn;
-  MDB_CHECK(mdb_txn_begin(mdb_env_, NULL, 0, &mdb_txn));
+  MDB_CHECK(mdb_txn_begin(mdb_env_, NULL, MDB_RDONLY, &mdb_txn));
   MDB_CHECK(mdb_dbi_open(mdb_txn, NULL, 0, &mdb_dbi_));
   return new LMDBTransaction(&mdb_dbi_, mdb_txn);
 }
