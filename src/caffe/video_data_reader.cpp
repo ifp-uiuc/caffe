@@ -113,6 +113,7 @@ void VideoDataReader::Body::InternalThreadEntry() {
       // name and same source.
       CHECK_EQ(new_queue_pairs_.size(), 0);
     }
+
   } catch (boost::thread_interrupted&) {
     // Interrupted exception is expected on shutdown
   }
@@ -143,16 +144,18 @@ void VideoDataReader::Body::random_sample(
     db::Transaction* txn, DatumList* dl, int_tp* label) {
   typedef boost::uniform_int<> distribution_type;
   typedef boost::variate_generator<caffe::rng_t*, boost::uniform_int<> > generator_type;
-  shared_ptr<caffe::rng_t> rd(caffe_rng());
+  DLOG(INFO) << "Label count :" << label_count;
   distribution_type label_distribution(0, label_count);
-  generator_type label_sampler(rd.get(), label_distribution);
+  generator_type label_sampler(caffe_rng(), label_distribution);
   int_tp label_choice = label_sampler();
   distribution_type sample_id_distribution(
-      0, (label_index[label_choice]).size());
-  generator_type sample_id_sampler(rd.get(), sample_id_distribution);
+      0, (label_index[label_choice]).size()-1);
+  generator_type sample_id_sampler(caffe_rng(), sample_id_distribution);
   int_tp sample_choice = sample_id_sampler();
 
   // get sample information
+  LOG(INFO) << "label choice: " << label_choice
+	    << " sample choice: " << sample_choice;
   std::tuple<std::string, int_tp, int_tp, int_tp> sample_
       = (label_index[label_choice])[sample_choice];
   std::string sample_video_id = std::get<0>(sample_);
@@ -160,9 +163,13 @@ void VideoDataReader::Body::random_sample(
   int_tp sample_begin_frame = std::get<1>(sample_);
   *label = std::get<3>(sample_);
 
+  CHECK(sample_duration > param_.video_param().temporal_size())
+    <<    "Sample duration :" << sample_duration
+    <<  "temproal_size: " << param_.video_param().temporal_size();
+  
   distribution_type begin_frame_distribution(
       0, sample_duration - param_.video_param().temporal_size());
-  generator_type begin_frame_sampler(rd.get(), begin_frame_distribution);
+  generator_type begin_frame_sampler(caffe_rng(), begin_frame_distribution);
   int_tp begin_frame_choice = begin_frame_sampler();
   fetch_one_sample(
       txn, dl, sample_video_id, begin_frame_choice + sample_begin_frame);
