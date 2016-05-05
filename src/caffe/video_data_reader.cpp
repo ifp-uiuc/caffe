@@ -210,10 +210,15 @@ void VideoDataReader::Body::fetch_one_sample(
   int_tp max_chunk_id = chunk_id(frame_begin + temporal_size - 1);
   for (int_tp chunk_id=min_chunk_id; chunk_id <= max_chunk_id; ++chunk_id) {
     string key_str = video_id + "_" + caffe::format_int(chunk_id, 6);
+    DLOG(INFO) << "Retrieving key: " << key_str;
     vector<char> value;
     txn->Get(key_str, &value);
+    DLOG(INFO) << "value length: " << value.size();
+	
     caffe::DatumList chunk;
-    chunk.ParseFromString(value.data());
+    DLOG(INFO) << "Parsing datumlist";
+    CHECK(chunk.ParseFromArray(value.data(), value.size()));
+    DLOG(INFO) << "Merging datumlist";
     chunk_aggragated->MergeFrom(chunk);
   }
   int_tp start_idx = frame_begin % 100;
