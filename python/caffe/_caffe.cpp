@@ -39,7 +39,7 @@ const int NPY_DTYPE = NPY_FLOAT32;
 // Selecting mode.
 void set_mode_cpu() { Caffe::set_mode(Caffe::CPU); }
 void set_mode_gpu() { Caffe::set_mode(Caffe::GPU); }
-void select_device(int id, bool listId) { Caffe::SelectDevice(id, listId); }
+void select_device(int id) { Caffe::SelectDevice(id); }
 void set_devices(bp::tuple args) {
   vector<int> devices(bp::len(args));
   for (int i = 0; i < bp::len(args); ++i) {
