@@ -151,22 +151,28 @@ void VideoDataReader::Body::random_sample(
   distribution_type sample_id_distribution(
       0, (label_index[label_choice]).size()-1);
   generator_type sample_id_sampler(caffe_rng(), sample_id_distribution);
-  int_tp sample_choice = sample_id_sampler();
+  // ensure the sampled video has larger duration then temporal size required
+  int_tp sample_duration, sample_begin_frame;
+  std::string sample_video_id;
+  do {
+    int_tp sample_choice = sample_id_sampler();
+    // get sample information
+    DLOG(INFO) << "label choice: " << label_choice
+               << " sample choice: " << sample_choice;
+    std::tuple<std::string, int_tp, int_tp, int_tp> sample_
+        = (label_index[label_choice])[sample_choice];
+    sample_video_id = std::get<0>(sample_);
+    sample_duration = std::get<2>(sample_);
+    sample_begin_frame = std::get<1>(sample_);
+    *label = std::get<3>(sample_);
+  } while (sample_duration < param_.video_param().temporal_size());
 
-  // get sample information
-  DLOG(INFO) << "label choice: " << label_choice
-	    << " sample choice: " << sample_choice;
-  std::tuple<std::string, int_tp, int_tp, int_tp> sample_
-      = (label_index[label_choice])[sample_choice];
-  std::string sample_video_id = std::get<0>(sample_);
-  int_tp sample_duration = std::get<2>(sample_);
-  int_tp sample_begin_frame = std::get<1>(sample_);
-  *label = std::get<3>(sample_);
-
+  /*
   CHECK(sample_duration > param_.video_param().temporal_size())
     <<    "Sample duration :" << sample_duration
     <<  "temproal_size: " << param_.video_param().temporal_size();
-  
+  */
+
   distribution_type begin_frame_distribution(
       0, sample_duration - param_.video_param().temporal_size());
   generator_type begin_frame_sampler(caffe_rng(), begin_frame_distribution);
