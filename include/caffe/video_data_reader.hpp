@@ -63,7 +63,7 @@ class VideoDataReader {
     void random_sample(db::Transaction* txn, DatumList* dl, int_tp* label);
     // Uniformly get 3d block
     void uniform_scan(db::Cursor* cur, DatumList* dl);
-    void fetch_one_sample(db::Transaction* txn, DatumList* dl,
+    bool fetch_one_sample(db::Transaction* txn, DatumList* dl,
                           std::string video_id, int_tp frame_begin);
     // Calculate chunk_id
     inline int_tp chunk_id(int_tp frame_id) {

@@ -154,31 +154,30 @@ void VideoDataReader::Body::random_sample(
   // ensure the sampled video has larger duration then temporal size required
   int_tp sample_duration, sample_begin_frame;
   std::string sample_video_id;
-  do {
-    int_tp sample_choice = sample_id_sampler();
-    // get sample information
-    DLOG(INFO) << "label choice: " << label_choice
-               << " sample choice: " << sample_choice;
-    std::tuple<std::string, int_tp, int_tp, int_tp> sample_
-        = (label_index[label_choice])[sample_choice];
-    sample_video_id = std::get<0>(sample_);
-    sample_duration = std::get<2>(sample_);
-    sample_begin_frame = std::get<1>(sample_);
-    *label = std::get<3>(sample_);
-  } while (sample_duration < param_.video_param().temporal_size());
-
-  /*
-  CHECK(sample_duration > param_.video_param().temporal_size())
-    <<    "Sample duration :" << sample_duration
-    <<  "temproal_size: " << param_.video_param().temporal_size();
-  */
-
-  distribution_type begin_frame_distribution(
-      0, sample_duration - param_.video_param().temporal_size());
-  generator_type begin_frame_sampler(caffe_rng(), begin_frame_distribution);
-  int_tp begin_frame_choice = begin_frame_sampler();
-  fetch_one_sample(
-      txn, dl, sample_video_id, begin_frame_choice + sample_begin_frame);
+  while (true) {
+    do {
+      int_tp sample_choice = sample_id_sampler();
+      // get sample information
+      DLOG(INFO) << "label choice: " << label_choice
+                 << " sample choice: " << sample_choice;
+      std::tuple<std::string, int_tp, int_tp, int_tp> sample_
+          = (label_index[label_choice])[sample_choice];
+      sample_video_id = std::get<0>(sample_);
+      sample_duration = std::get<2>(sample_);
+      sample_begin_frame = std::get<1>(sample_);
+      *label = std::get<3>(sample_);
+    } while (sample_duration < param_.video_param().temporal_size());
+    distribution_type begin_frame_distribution(
+        0, sample_duration - param_.video_param().temporal_size());
+    generator_type begin_frame_sampler(caffe_rng(), begin_frame_distribution);
+    int_tp begin_frame_choice = begin_frame_sampler();
+    if (fetch_one_sample(
+            txn, dl, sample_video_id, begin_frame_choice + sample_begin_frame)) {
+      break;
+    } else {
+      LOG(ERROR) << "Resampling";
+    }
+  }
 }
 
 void VideoDataReader::Body::uniform_scan(
@@ -213,32 +212,43 @@ void VideoDataReader::Body::uniform_scan(
  * Fetch one sample from txn
  * The sample could span on multiple chunks
  */
-void VideoDataReader::Body::fetch_one_sample(
+bool VideoDataReader::Body::fetch_one_sample(
     db::Transaction* txn, DatumList* dl,
     std::string video_id, int_tp frame_begin) {
   CHECK(dl);
   shared_ptr<DatumList> chunk_aggragated(new caffe::DatumList());
+  int_tp temp_size = param_.video_param().temporal_size();
   int_tp temporal_size = param_.video_param().temporal_size();
   int_tp min_chunk_id = chunk_id(frame_begin);
   int_tp max_chunk_id = chunk_id(frame_begin + temporal_size - 1);
+  string key_str;
   for (int_tp chunk_id=min_chunk_id; chunk_id <= max_chunk_id; ++chunk_id) {
-    string key_str = video_id + "_" + caffe::format_int(chunk_id, 6);
+    key_str = video_id + "_" + caffe::format_int(chunk_id, 6);
     DLOG(INFO) << "Retrieving key: " << key_str;
     vector<char> value;
     txn->Get(key_str, &value);
     DLOG(INFO) << "value length: " << value.size();
-	
+
     caffe::DatumList chunk;
     DLOG(INFO) << "Parsing datumlist";
     CHECK(chunk.ParseFromArray(value.data(), value.size()));
+    DLOG(INFO) << "Chunk Size: " << chunk.datums_size();
     DLOG(INFO) << "Merging datumlist";
     chunk_aggragated->MergeFrom(chunk);
   }
+  DLOG(INFO) << "Aggregated datum number: "<< chunk_aggragated->datums_size();
   int_tp start_idx = frame_begin % 100;
-  for (int i=0; i<param_.video_param().temporal_size(); ++i) {
+  if (chunk_aggragated->datums_size() < (start_idx + temp_size)) {
+    LOG(ERROR) << "Error DatumList: [Key: " << key_str << "]";
+    return false;
+  }
+  DLOG(INFO) << "Start ID: " << start_idx;
+  for (int i=0; i<temp_size; ++i) {
+    DLOG(INFO) << "Copying datum " << i;
     Datum* datum = dl->add_datums();
     datum->CopyFrom(chunk_aggragated->datums(i+start_idx));
   }
+  return true;
 }
 
 void VideoDataReader::Body::read_one(
