@@ -377,10 +377,6 @@ P2PSync<Dtype>::P2PSync(shared_ptr<Solver<Dtype> > root_solver,
 
   // Everyone has a grad buffer on host.
   cpu_grads_ = new Dtype[size_];
-  // Everyone has a grad buffer on device, too.
-  // In this greentea case, this is actually 'child_grad_'
-  const int self = param.device_id();
-  greentea_malloc((void**) &parent_grads_, size_*sizeof(Dtype), self);
 
   Caffe::SetDevice(initial_device);
 
@@ -564,19 +560,23 @@ void P2PSync<Dtype>::on_gradients_ready() {
 #ifdef USE_GREENTEA
   // Sum children gradients as they appear in the queue
   int device_id = solver_->param().device_id();
+  // Copy my own gradients to CPU memory. 
+  greentea_copy(device_id, size_, (cl_mem) diff_, 0, cpu_grads_);
+  Caffe::Synchronize(device_id);
+
   for (int i = 0; i < children_.size(); ++i) {
     P2PSync<Dtype> *child = queue_.pop();
     Dtype* src = child->cpu_grads_;
-    greentea_copy(device_id, size_, src, (cl_mem) parent_grads_, 0);
-    greentea_gpu_add<Dtype>(device_id, size_, (cl_mem) parent_grads_, 0, (cl_mem) diff_, 0, (cl_mem) diff_, 0);
+    // Add child's gradients 
+    caffe_add(size_, src, this->cpu_grads_, this->cpu_grads_);
   }
 
   // Send gradients to parent
   if (parent_) {
-    greentea_copy(device_id, size_, (cl_mem) diff_, 0, cpu_grads_);
-    Caffe::Synchronize(device_id);
     parent_->queue_.push(this);
   } else {
+    // On root thread, move gradients back to device.
+    greentea_copy(device_id, size_, this->cpu_grads_, (cl_mem) diff_, 0);
     // Loss functions divide gradients by the batch size, so to compensate
     // for split batch, the root solver divides by number of solvers.
     greentea_gpu_scale(device_id, size_, Dtype(1.0 / Caffe::solver_count()), (cl_mem) diff_, 0, (cl_mem) diff_, 0);
