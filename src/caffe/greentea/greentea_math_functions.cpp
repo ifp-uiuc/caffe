@@ -89,6 +89,7 @@ void greentea_gpu_memcpy(const uint_tp N, const cl_mem X, const int_tp offX,
     clEnqueueReadBuffer(ctx->get_queue().handle().get(), X, CL_TRUE, offX, N, Y,
                         0, NULL, NULL);
   }
+  ctx->get_queue().finish();
 }
 
 // Copy from main memory to OpenCL buffer
@@ -98,6 +99,7 @@ void greentea_gpu_memcpy(const uint_tp N, const void *X, cl_mem Y,
     clEnqueueWriteBuffer(ctx->get_queue().handle().get(), Y, CL_TRUE, offY, N,
                          X, 0, NULL, NULL);
   }
+  ctx->get_queue().finish();
 }
 
 // Copy from OpenCL to OpenCL buffer
@@ -106,6 +108,7 @@ void greentea_gpu_memcpy(const uint_tp N, const cl_mem X, const int_tp offX,
                          viennacl::ocl::context *ctx) {
   clEnqueueCopyBuffer(ctx->get_queue().handle().get(), X, Y, offX, offY, N, 0,
                       NULL, NULL);
+  ctx->get_queue().finish();
 }
 
 template <typename Dtype>
