@@ -81,7 +81,7 @@ void _copy_frame(int_tp item_id, int_tp frame_id, const Blob<Dtype> &frame,
     int_tp offset_frame = frame.offset(0, ch);
     int_tp N = frame.count(2);
     int_tp offset_seq = sequence->offset(indices);
-    caffe_copy(N, frame.cpu_data() + offset_frame,
+    caffe_cpu_copy(N, frame.cpu_data() + offset_frame,
 	       sequence->mutable_cpu_data() + offset_seq);
   }
 }
