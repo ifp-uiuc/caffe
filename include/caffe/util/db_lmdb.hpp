@@ -57,7 +57,7 @@ class LMDBTransaction : public Transaction {
   explicit LMDBTransaction(MDB_dbi* mdb_dbi, MDB_txn* mdb_txn)
     : mdb_dbi_(mdb_dbi), mdb_txn_(mdb_txn) { }
   virtual void Put(const string& key, const string& value);
-  virtual void Get(const string& key, vector<char> *value);
+  virtual int Get(const string& key, vector<char> *value);
   virtual void Commit() { MDB_CHECK(mdb_txn_commit(mdb_txn_)); }
 
  private:
