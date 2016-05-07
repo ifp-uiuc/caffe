@@ -226,7 +226,10 @@ bool VideoDataReader::Body::fetch_one_sample(
     key_str = video_id + "_" + caffe::format_int(chunk_id, 6);
     DLOG(INFO) << "Retrieving key: " << key_str;
     vector<char> value;
-    txn->Get(key_str, &value);
+    if(txn->Get(key_str, &value) == 0) {
+      LOG(ERROR) << "Key " << key_str << " not found.";
+      return false;
+    }
     DLOG(INFO) << "value length: " << value.size();
 
     caffe::DatumList chunk;
