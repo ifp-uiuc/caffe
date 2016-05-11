@@ -12,9 +12,9 @@ void MVNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   Dtype* top_data = top[0]->mutable_gpu_data();
   int_tp num;
   if (this->layer_param_.mvn_param().across_channels())
-    num = bottom[0]->num();
+    num = bottom[0]->shape(0);
   else
-    num = bottom[0]->num() * bottom[0]->channels();
+    num = bottom[0]->shape(0) * bottom[0]->shape(1);
 
   int_tp dim = bottom[0]->count() / num;
 
@@ -115,9 +115,9 @@ void MVNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
 
   int_tp num;
   if (this->layer_param_.mvn_param().across_channels())
-    num = bottom[0]->num();
+    num = bottom[0]->shape(0);
   else
-    num = bottom[0]->num() * bottom[0]->channels();
+    num = bottom[0]->shape(0) * bottom[0]->shape(1);
 
   int_tp dim = bottom[0]->count() / num;
 
