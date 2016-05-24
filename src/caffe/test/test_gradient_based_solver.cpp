@@ -197,11 +197,11 @@ class GradientBasedSolverTest : public MultiDeviceTest<TypeParam> {
       LOG(INFO)<< "Multi-GPU test on " << devices << " devices";
       vector<device*> gpus;
       // put current device at the beginning
-      device* dc = Caffe::GetDevice(solver_->param().device_id(), true);
+      device* dc = Caffe::GetDevice(solver_->param().device_id());
       gpus.push_back(dc);
       for (int i = 0; gpus.size() < devices; ++i) {
         if (i != device_id)
-        gpus.push_back(Caffe::GetDevice(i, true));
+        gpus.push_back(Caffe::GetDevice(i));
       }
       Caffe::set_solver_count(gpus.size());
       this->sync_.reset(new P2PSync<Dtype>(

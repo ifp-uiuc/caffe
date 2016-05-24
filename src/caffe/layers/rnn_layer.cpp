@@ -70,9 +70,9 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   LayerParameter tanh_param;
   tanh_param.set_type("TanH");
 
-  LayerParameter scalar_param;
-  scalar_param.set_type("Scalar");
-  scalar_param.mutable_scalar_param()->set_axis(0);
+  LayerParameter scale_param;
+  scale_param.set_type("Scale");
+  scale_param.mutable_scale_param()->set_axis(0);
 
   LayerParameter slice_param;
   slice_param.set_type("Slice");
@@ -153,7 +153,7 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     //                       0   otherwise
     {
       LayerParameter* cont_h_param = net_param->add_layer();
-      cont_h_param->CopyFrom(scalar_param);
+      cont_h_param->CopyFrom(scale_param);
       cont_h_param->set_name("h_conted_" + tm1s);
       cont_h_param->add_bottom("h_" + tm1s);
       cont_h_param->add_bottom("cont_" + ts);
