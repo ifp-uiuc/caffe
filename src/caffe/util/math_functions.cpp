@@ -4,7 +4,9 @@
 #include <limits>
 
 #include "caffe/common.hpp"
+#include "caffe/device.hpp"
 #include "caffe/util/math_functions.hpp"
+#include "caffe/greentea/greentea_math_functions.hpp"
 #include "caffe/util/rng.hpp"
 
 namespace caffe {
@@ -117,6 +119,9 @@ void caffe_copy(const int_tp N, const Dtype* X, Dtype* Y) {
       // NOLINT_NEXT_LINE(caffe/alt_fn)
       CUDA_CHECK(cudaMemcpy(Y, X, sizeof(Dtype) * N, cudaMemcpyDefault));
 #endif  // USE_CUDA
+#ifdef USE_GREENTEA
+      greentea_copy<Dtype>(Caffe::GetDefaultDevice()->id(), N, (cl_mem) X, 0, (cl_mem) Y, 0);
+#endif // USE_GREENTEA
 #else
       NO_GPU;
 #endif

@@ -44,27 +44,31 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   NetParameter net_param;
   net_param.set_force_backward(true);
 
-  net_param.add_input("x");
+  LayerParameter *input_param = net_param.add_layer();
+  input_param->add_top("x");
+  input_param->set_type("Input");
+  input_param->set_name("input");
+
   BlobShape input_shape;
   for (int i = 0; i < bottom[0]->num_axes(); ++i) {
     input_shape.add_dim(bottom[0]->shape(i));
   }
-  net_param.add_input_shape()->CopyFrom(input_shape);
+  input_param->mutable_input_param()->add_shape()->CopyFrom(input_shape);
 
   input_shape.Clear();
   for (int i = 0; i < bottom[1]->num_axes(); ++i) {
     input_shape.add_dim(bottom[1]->shape(i));
   }
-  net_param.add_input("cont");
-  net_param.add_input_shape()->CopyFrom(input_shape);
+  input_param->add_top("cont");
+  input_param->mutable_input_param()->add_shape()->CopyFrom(input_shape);
 
   if (static_input_) {
     input_shape.Clear();
     for (int i = 0; i < bottom[2]->num_axes(); ++i) {
       input_shape.add_dim(bottom[2]->shape(i));
     }
-    net_param.add_input("x_static");
-    net_param.add_input_shape()->CopyFrom(input_shape);
+    input_param->add_top("x_static");
+    input_param->mutable_input_param()->add_shape()->CopyFrom(input_shape);    
   }
 
   // Call the child's FillUnrolledNet implementation to specify the unrolled

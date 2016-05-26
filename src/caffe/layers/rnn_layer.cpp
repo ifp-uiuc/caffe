@@ -81,8 +81,11 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   vector<BlobShape> input_shapes;
   RecurrentInputShapes(&input_shapes);
   CHECK_EQ(1, input_shapes.size());
-  net_param->add_input("h_0");
-  net_param->add_input_shape()->CopyFrom(input_shapes[0]);
+
+  LayerParameter* h0_input_param = net_param->add_layer();
+  h0_input_param->set_type("Input");
+  h0_input_param->add_top("h_0");  
+  h0_input_param->mutable_input_param()->add_shape()->CopyFrom(input_shapes[0]);
 
   LayerParameter* cont_slice_param = net_param->add_layer();
   cont_slice_param->CopyFrom(slice_param);
