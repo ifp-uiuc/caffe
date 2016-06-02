@@ -960,6 +960,8 @@ message RecurrentParameter {
 
   // Whether to enable displaying debug_info in the unrolled recurrent net.
   optional bool debug_info = 4 [default = false];
+  optional string recurrent_unit_type = 5 [default = "ReLU"];
+  optional string output_unit_type = 6 [default = "ReLU"];
 }
 
 // Message that stores parameters used by ReductionLayer

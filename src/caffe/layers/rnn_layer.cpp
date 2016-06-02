@@ -54,21 +54,30 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   hidden_param.mutable_inner_product_param()->set_num_output(num_output);
   hidden_param.mutable_inner_product_param()->set_bias_term(false);
   hidden_param.mutable_inner_product_param()->set_axis(2);
+  
+  FillerParameter recurrent_w_filler;
+  FillerParameter recurrent_b_filler;
+  recurrent_w_filler.set_type("identity");
+  recurrent_w_filler.set_value(1);
+  recurrent_b_filler.set_type("constant");
+
   hidden_param.mutable_inner_product_param()->
-      mutable_weight_filler()->CopyFrom(weight_filler);
+      mutable_weight_filler()->CopyFrom(recurrent_w_filler);
 
   LayerParameter biased_hidden_param(hidden_param);
   biased_hidden_param.mutable_inner_product_param()->set_bias_term(true);
   biased_hidden_param.mutable_inner_product_param()->
-      mutable_bias_filler()->CopyFrom(bias_filler);
+      mutable_bias_filler()->CopyFrom(recurrent_b_filler);
 
   LayerParameter sum_param;
   sum_param.set_type("Eltwise");
   sum_param.mutable_eltwise_param()->set_operation(
       EltwiseParameter_EltwiseOp_SUM);
+  LayerParameter recurrent_unit_param;
+  recurrent_unit_param.set_type(this->layer_param_.recurrent_param().recurrent_unit_type());
 
-  LayerParameter tanh_param;
-  tanh_param.set_type("TanH");
+  LayerParameter output_unit_param;
+  output_unit_param.set_type(this->layer_param_.recurrent_param().output_unit_type());
 
   LayerParameter scale_param;
   scale_param.set_type("Scale");
@@ -98,6 +107,11 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   {
     LayerParameter* x_transform_param = net_param->add_layer();
     x_transform_param->CopyFrom(biased_hidden_param);
+    x_transform_param->mutable_inner_product_param()->
+      mutable_weight_filler()->CopyFrom(weight_filler);
+    x_transform_param->mutable_inner_product_param()->
+      mutable_bias_filler()->CopyFrom(bias_filler);
+
     x_transform_param->set_name("x_transform");
     x_transform_param->add_param()->set_name("W_xh");
     x_transform_param->add_param()->set_name("b_h");
@@ -191,7 +205,7 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     }
     {
       LayerParameter* h_neuron_param = net_param->add_layer();
-      h_neuron_param->CopyFrom(tanh_param);
+      h_neuron_param->CopyFrom(recurrent_unit_param);
       h_neuron_param->set_name("h_neuron_" + ts);
       h_neuron_param->add_bottom("h_neuron_input_" + ts);
       h_neuron_param->add_top("h_" + ts);
@@ -202,6 +216,11 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     {
       LayerParameter* w_param = net_param->add_layer();
       w_param->CopyFrom(biased_hidden_param);
+      w_param->mutable_inner_product_param()->
+	mutable_weight_filler()->CopyFrom(weight_filler);
+      w_param->mutable_inner_product_param()->
+	mutable_bias_filler()->CopyFrom(bias_filler);
+
       w_param->set_name("W_ho_h_" + ts);
       w_param->add_param()->set_name("W_ho");
       w_param->add_param()->set_name("b_o");
@@ -215,7 +234,7 @@ void RNNLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     //          = \tanh( W_ho_h_t )
     {
       LayerParameter* o_neuron_param = net_param->add_layer();
-      o_neuron_param->CopyFrom(tanh_param);
+      o_neuron_param->CopyFrom(output_unit_param);
       o_neuron_param->set_name("o_neuron_" + ts);
       o_neuron_param->add_bottom("W_ho_h_" + ts);
       o_neuron_param->add_top("o_" + ts);
